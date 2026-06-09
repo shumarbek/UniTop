@@ -30,7 +30,7 @@ export async function GET() {
 
   const tableChecks = await Promise.all(
     requiredTables.map(async (table) => {
-      const { error } = await supabase.from(table).select("*", { count: "exact", head: true });
+      const { error } = await supabase.from(table).select("*").limit(1);
       return { table, ok: !error, error: error?.message ?? null };
     })
   );

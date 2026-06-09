@@ -1,1 +1,1 @@
-{"version":1,"functions":{"/api/telegram/status":{},"/api/admin/stats":{},"/api/faq":{},"/api/setup/status":{}}}
+{"version":1,"functions":{"/api/telegram/status":{},"/api/setup/status":{},"/api/faq":{},"/api/admin/stats":{}}}
