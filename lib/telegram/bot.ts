@@ -60,14 +60,39 @@ export function buildWelcomeMessage(firstName = "do'stim") {
 }
 
 export function buildWelcomeKeyboard(referralCode?: string) {
-  const channel = process.env.TELEGRAM_REQUIRED_CHANNEL ?? "@unitop_uz";
+  const channel = normalizeTelegramChannel(process.env.TELEGRAM_REQUIRED_CHANNEL ?? "@unitop_uz");
   return {
     inline_keyboard: [
       [{ text: "UniTop Mini App", web_app: { url: getMiniAppUrl(referralCode) } }],
-      [{ text: "Rasmiy kanal", url: channel.startsWith("@") ? `https://t.me/${channel.slice(1)}` : String(channel) }],
+      [{ text: "Rasmiy kanal", url: getTelegramChannelUrl(channel) }],
       [{ text: "Obunani tekshirish", callback_data: "check_channel" }]
     ]
   };
+}
+
+export function normalizeTelegramChannel(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (/^-100\d+$/.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("@")) return trimmed;
+
+  try {
+    const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+    if (url.hostname === "t.me" || url.hostname === "telegram.me") {
+      const username = url.pathname.split("/").filter(Boolean)[0];
+      return username ? `@${username}` : trimmed;
+    }
+  } catch {
+    // Fall through to username normalization.
+  }
+
+  return `@${trimmed.replace(/^\/+/, "")}`;
+}
+
+export function getTelegramChannelUrl(value: string) {
+  const channel = normalizeTelegramChannel(value);
+  if (channel.startsWith("@")) return `https://t.me/${channel.slice(1)}`;
+  return `https://t.me/c/${channel.replace("-100", "")}`;
 }
 
 export async function sendTelegramMessage(payload: SendMessagePayload) {

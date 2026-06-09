@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { describe, expect, it } from "vitest";
-import { buildWelcomeKeyboard, buildWelcomeMessage, escapeHtml, parseStartPayload } from "@/lib/telegram/bot";
+import { buildWelcomeKeyboard, buildWelcomeMessage, escapeHtml, getTelegramChannelUrl, normalizeTelegramChannel, parseStartPayload } from "@/lib/telegram/bot";
 import { verifyTelegramInitData } from "@/lib/telegram/init-data";
 
 function signInitData(data: Record<string, string>, botToken: string) {
@@ -29,6 +29,13 @@ describe("telegram bot helpers", () => {
   it("builds mini app keyboard", () => {
     const keyboard = buildWelcomeKeyboard("ref-1");
     expect(keyboard.inline_keyboard[0][0].web_app?.url).toContain("ref=ref-1");
+  });
+
+  it("normalizes Telegram channel urls for Bot API", () => {
+    expect(normalizeTelegramChannel("https://t.me/UniTop_rasmiy")).toBe("@UniTop_rasmiy");
+    expect(normalizeTelegramChannel("t.me/UniTop_rasmiy")).toBe("@UniTop_rasmiy");
+    expect(normalizeTelegramChannel("@UniTop_rasmiy")).toBe("@UniTop_rasmiy");
+    expect(getTelegramChannelUrl("https://t.me/UniTop_rasmiy")).toBe("https://t.me/UniTop_rasmiy");
   });
 });
 
