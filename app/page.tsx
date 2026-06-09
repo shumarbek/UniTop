@@ -23,7 +23,7 @@ import { interests, purposes } from "@/lib/options";
 
 const regions = ["Toshkent", "Samarqand", "Buxoro", "Farg'ona", "Andijon", "Namangan", "Qashqadaryo"];
 
-type Step = "boot" | "terms" | "channel" | "profile" | "discover";
+type Step = "boot" | "telegram" | "terms" | "channel" | "profile" | "discover";
 type Tab = "discover" | "matches" | "premium" | "support";
 type Candidate = {
   id: string;
@@ -53,7 +53,7 @@ export default function MiniAppHome() {
     tg?.setHeaderColor?.("#f4f7fb");
     tg?.setBackgroundColor?.("#f4f7fb");
 
-    const initData = tg?.initData ?? "";
+    const initData = getTelegramInitData();
     void authTelegram(initData);
     // Telegram WebApp bootstrapping must run once on Mini App open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,8 +71,9 @@ export default function MiniAppHome() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Telegram auth xatosi");
       const id = Number(payload.user?.telegram_id ?? payload.user?.id);
-      if (!id) throw new Error("Ilovani Telegram ichida oching.");
+      if (!id) throw new Error("Telegram ID kelmadi. Botdagi UniTop Mini App tugmasidan qayta oching.");
       setTelegramId(id);
+      window.localStorage.setItem("unitop_telegram_id", String(id));
       const meResponse = await fetch(`/api/me?telegramId=${id}`);
       const me = await meResponse.json();
       setProfileStatus(me.profile?.status ?? me.user?.profiles?.[0]?.status ?? "draft");
@@ -84,8 +85,15 @@ export default function MiniAppHome() {
         await loadDiscovery(id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Noma'lum xatolik");
-      setStep("terms");
+      const savedId = Number(window.localStorage.getItem("unitop_telegram_id"));
+      if (savedId) {
+        setTelegramId(savedId);
+        setError("Telegram sessiya yangilanmadi. Botdagi Mini App tugmasidan qayta ochsangiz sessiya to'liq tiklanadi.");
+        setStep("terms");
+      } else {
+        setError(err instanceof Error ? err.message : "Noma'lum xatolik");
+        setStep("telegram");
+      }
     } finally {
       setBusy(false);
     }
@@ -99,9 +107,10 @@ export default function MiniAppHome() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ telegramId })
     });
+    const payload = await response.json().catch(() => ({}));
     setBusy(false);
     if (response.ok) setStep("channel");
-    else setError("Shartlarni saqlashda xatolik.");
+    else setError(payload.error ?? "Shartlarni saqlashda xatolik.");
   }
 
   async function checkChannel() {
@@ -115,7 +124,7 @@ export default function MiniAppHome() {
     const payload = await response.json();
     setBusy(false);
     if (payload.member) setStep("profile");
-    else setError("Avval rasmiy kanalga obuna bo'ling.");
+    else setError(payload.error ?? payload.description ?? "Avval rasmiy kanalga obuna bo'ling.");
   }
 
   async function loadDiscovery(id = telegramId) {
@@ -142,7 +151,7 @@ export default function MiniAppHome() {
     setMatches(payload.matches ?? []);
   }
 
-  const progress = useMemo(() => ({ boot: 10, terms: 25, channel: 50, profile: 75, discover: 100 }[step]), [step]);
+  const progress = useMemo(() => ({ boot: 10, telegram: 10, terms: 25, channel: 50, profile: 75, discover: 100 }[step]), [step]);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-md overflow-hidden bg-[#eef3f7] text-ink">
@@ -170,6 +179,7 @@ export default function MiniAppHome() {
 
         <div className="relative z-10 px-5">
           {step === "boot" && <LoadingPanel text="Telegram sessiya tekshirilmoqda..." />}
+          {step === "telegram" && <TelegramRequiredPanel />}
           {step === "terms" && <TermsPanel busy={busy} onAccept={acceptTerms} />}
           {step === "channel" && <ChannelPanel busy={busy} onCheck={checkChannel} />}
           {step === "profile" && telegramId && <ProfilePanel telegramId={telegramId} onDone={() => { setProfileStatus("pending"); setStep("discover"); }} />}
@@ -190,6 +200,31 @@ export default function MiniAppHome() {
         </div>
       </section>
     </main>
+  );
+}
+
+function getTelegramInitData() {
+  const tgInitData = window.Telegram?.WebApp?.initData;
+  if (tgInitData) return tgInitData;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const searchInitData = searchParams.get("tgWebAppData");
+  if (searchInitData) return searchInitData;
+
+  const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+  const hashParams = new URLSearchParams(hash);
+  return hashParams.get("tgWebAppData") ?? "";
+}
+
+function TelegramRequiredPanel() {
+  return (
+    <GlassPanel>
+      <div className="grid h-16 w-16 place-items-center rounded-3xl bg-ink text-white shadow-soft"><MessageCircle size={28} /></div>
+      <h2 className="mt-5 text-3xl font-black">Telegram orqali oching</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        Bu ilova Telegram Mini App sessiyasini talab qiladi. Botdagi <b>UniTop Mini App</b> tugmasidan oching; oddiy brauzer yoki localhost orqali Telegram ID kelmaydi.
+      </p>
+    </GlassPanel>
   );
 }
 
@@ -394,6 +429,7 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData?: string;
+        initDataUnsafe?: { user?: { id?: number } };
         ready?: () => void;
         expand?: () => void;
         setHeaderColor?: (color: string) => void;

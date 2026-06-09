@@ -18,8 +18,15 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from("users")
-    .update({ terms_version: TERMS_VERSION, terms_accepted_at: new Date().toISOString() })
-    .eq("telegram_id", telegramId);
+    .upsert(
+      {
+        telegram_id: telegramId,
+        terms_version: TERMS_VERSION,
+        terms_accepted_at: new Date().toISOString(),
+        language_code: "uz"
+      },
+      { onConflict: "telegram_id" }
+    );
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
